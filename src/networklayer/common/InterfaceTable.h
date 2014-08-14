@@ -1,5 +1,6 @@
 //
 // Copyright (C) 2005 Andras Varga
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -68,6 +69,10 @@
 class INET_API InterfaceTable : public cSimpleModule, public IInterfaceTable, protected INotifiable, public ILifecycle
 {
   protected:
+    bool dummyInterfaceTable;
+    std::string hostModuleFullPath;
+    int hostModuleId;
+
     cModule *host; // cached pointer
     NotificationBoard *nb; // cached pointer
 
@@ -113,6 +118,16 @@ class INET_API InterfaceTable : public cSimpleModule, public IInterfaceTable, pr
     virtual void handleMessage(cMessage *);
 
   public:
+
+    virtual void setDummyInterfaceTable(bool dummy);
+    bool isDummyInterfaceTable();
+
+
+    void setHostModuleFullPath(std::string fullpath);
+    std::string getHostModuleFullPath();
+    void setHostModuleId(int moduleid);
+    int getHostModuleId();
+
     /**
      * Called by the NotificationBoard whenever a change of a category
      * occurs to which this client has subscribed.

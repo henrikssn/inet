@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2003 Andras Varga; CTIE, Monash University, Australia
- *
+ * Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
+ * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
  * as published by the Free Software Foundation; either version 2
@@ -28,6 +29,19 @@ const MACAddress MACAddress::UNSPECIFIED_ADDRESS;
 const MACAddress MACAddress::BROADCAST_ADDRESS("ff:ff:ff:ff:ff:ff");
 const MACAddress MACAddress::MULTICAST_PAUSE_ADDRESS("01:80:C2:00:00:01");
 const MACAddress MACAddress::STP_MULTICAST_ADDRESS("01:80:C2:00:00:00");
+
+void doPacking(cCommBuffer *buffer, MACAddress &addr) {
+    buffer->pack(addr.getInt());
+}
+
+void doUnpacking(cCommBuffer *buffer, MACAddress &addr) {
+    uint64 value;
+    buffer->unpack(value);
+    for(int i = 0; i < MAC_ADDRESS_SIZE; i++)
+        addr.setAddressByte(MAC_ADDRESS_SIZE-i-1,value>>(8*i));
+    
+
+}
 
 unsigned char MACAddress::getAddressByte(unsigned int k) const
 {
@@ -147,6 +161,16 @@ MACAddress MACAddress::generateAutoAddress()
     MACAddress addr(intAddr);
     return addr;
 }
+
+MACAddress MACAddress::generateAutoAddress(unsigned int &lastUsedAddress)
+{
+    ++lastUsedAddress;
+
+    uint64 intAddr = 0x0AAA00000000L + (lastUsedAddress & 0xffffffffL);
+    MACAddress addr(intAddr);
+    return addr;
+}
+
 
 // see  RFC 1112, section 6.4
 MACAddress MACAddress::makeMulticastAddress(IPv4Address addr)

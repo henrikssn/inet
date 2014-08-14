@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2003 Andras Varga; CTIE, Monash University, Australia
+ * Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
@@ -19,8 +20,10 @@
 #define __INET_ETHERMAC_H
 
 #include "INETDefs.h"
+#include <omnetpp.h>
 
 #include "EtherMACBase.h"
+#include "EtherMACState.h"
 
 
 class EtherJam;
@@ -41,9 +44,11 @@ class INET_API EtherMAC : public EtherMACBase
     virtual ~EtherMAC();
 
   protected:
-    virtual void initialize(int stage);
+    virtual cState& initialize(int stage, cState& state);
+    virtual int numInitStages() const  {return 3;}
     virtual void initializeFlags();
     virtual void initializeStatistics();
+    virtual void initializeMACAddress();
     virtual void handleMessage(cMessage *msg);
     virtual void finish();
 
@@ -79,6 +84,10 @@ class INET_API EtherMAC : public EtherMACBase
 
     static simsignal_t collisionSignal;
     static simsignal_t backoffSignal;
+
+
+    //internal
+    EtherMACState *currentState; //stores the state given by parallel initalization
 
   protected:
     // event handlers

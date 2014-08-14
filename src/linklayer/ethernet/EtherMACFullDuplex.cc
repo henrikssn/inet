@@ -1,6 +1,7 @@
 //
 // Copyright (C) 2006 Levente Meszaros
 // Copyright (C) 2011 Zoltan Bojthe
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
@@ -23,26 +24,161 @@
 #include "NotificationBoard.h"
 #include "NotifierConsts.h"
 #include "InterfaceEntry.h"
+#include "MACBase.h"
 
 // TODO: refactor using a statemachine that is present in a single function
 // TODO: this helps understanding what interactions are there and how they affect the state
 
 Define_Module(EtherMACFullDuplex);
+Register_ParallelInitialization_Module(EtherMACFullDuplex);
 
 EtherMACFullDuplex::EtherMACFullDuplex()
 {
 }
 
-void EtherMACFullDuplex::initialize(int stage)
+cState& EtherMACFullDuplex::initialize(int stage, cState& state)
 {
-    EtherMACBase::initialize(stage);
+    currentState = state.getState()==NULL ? new EtherMACState() : dynamic_cast<EtherMACState*>(state.getState());
+        if(currentState==NULL) // we are the first who get the status
+            throw cRuntimeError("the state '%s' can't be casted to EtherMACState. ", state.getState()->getClassName());
 
-    if (stage == 0)
+        MACBase::initialize(stage);
+
+        if(stage == 0) //stage 0: publish gate ids
+        {
+            //initialize
+            EtherMACBase::initialize(stage);
+
+
+
+            cGate *physOutEndGate = physOutGate->getPathEndGate();
+            cModule *physOutEndOwnerMod = physOutEndGate->getOwnerModule();
+
+            cGate *physInStartGate = physInGate->getPathStartGate();
+            cModule *physInStartOwnerMod = physInStartGate->getOwnerModule();
+
+            if(physOutEndOwnerMod->isPlaceholder() && physInStartOwnerMod->isPlaceholder()) //physOut->getPathEndGate is a proxygate -> we add our question to the map
+            {
+
+                currentState->addConnectionState(new ConnectionState(physOutEndOwnerMod->getId(),physOutEndGate->getId()));
+                currentState->addConnectionState(new ConnectionState(physInStartOwnerMod->getId(),physInStartGate->getId()));
+
+            }
+
+        }
+        else if (stage == 1) //stage 1: get gate ip
+        {
+
+            cArray* connectionStates = currentState->getConnectionStates();
+            for (cArray::Iterator i(*connectionStates,true); !i.end(); i++)
+            {
+                ConnectionState *connectionState = dynamic_cast<ConnectionState*>(i());
+
+                ASSERT(connectionState);
+
+                //check physOut
+                const cGate *g;
+                for (g=physOutGate; g->getNextGate()!=NULL; g=g->getNextGate())
+                {
+                    if(connectionState->getModuleId() == g->getOwnerModule()->getId() && connectionState->getGateId() == g->getId())
+                    {
+                        connectionState->setConnected(true);
+                    }
+                }
+
+                //check physIn
+                for (g=physInGate; g->getPreviousGate()!=NULL; g=g->getPreviousGate())
+                {
+                    if(connectionState->getModuleId() == g->getOwnerModule()->getId() && connectionState->getGateId() == g->getId())
+                    {
+                        connectionState->setConnected(true);
+                    }
+                }
+
+            }
+        }
+        else if (stage == 2) //lookup if gate connected on other LP
+        {
+            cGate *physOutEndGate = physOutGate->getPathEndGate();
+            cModule *physOutEndOwnerMod = physOutEndGate->getOwnerModule();
+
+            cGate *physInStartGate = physInGate->getPathStartGate();
+            cModule *physInStartOwnerMod = physInStartGate->getOwnerModule();
+
+            if(!physOutEndOwnerMod->isPlaceholder() && !physInStartOwnerMod->isPlaceholder()) //we can set connected directly (local modules)
+            {
+                connected = physOutEndGate->isConnected() && physInStartGate->isConnected();
+            }
+            else if(physOutEndOwnerMod->isPlaceholder() && physInStartOwnerMod->isPlaceholder())
+            {
+
+                bool physInConnected = false;
+                bool physOutConnected = false;
+
+                cArray* connectionStates = currentState->getConnectionStates();
+                for (cArray::Iterator i(*connectionStates,true); !i.end(); i++)
+                {
+                    ConnectionState *connectionState = dynamic_cast<ConnectionState*>(i());
+                    ASSERT(connectionState);
+
+                    if(physOutEndOwnerMod->getId() == connectionState->getModuleId() &&
+                           physOutEndGate->getId() == connectionState->getGateId())
+                    {
+                        physOutConnected = true;
+                    }
+
+                    if(physInStartOwnerMod->getId() == connectionState->getModuleId() &&
+                           physInStartGate->getId() == connectionState->getGateId())
+                    {
+                        physInConnected = true;
+                    }
+
+                    if(physInConnected && physOutConnected)
+                    {
+                        connected = true;
+                        break;
+                    }
+
+                }
+
+
+            }
+
+            if (!connected)
+                EV << "MAC not connected to a network.\n";
+
+            readChannelParameters(true);
+            if (!par("duplexMode").boolValue())
+                    throw cRuntimeError("Half duplex operation is not supported by EtherMACFullDuplex, use the EtherMAC module for that! (Please enable csmacdSupport on EthernetInterface)");
+
+            beginSendFrames();
+        }
+
+
+
+
+    state.setState(currentState);
+    return state;
+
+}
+
+void EtherMACFullDuplex::initializeMACAddress()
+{
+    const char *addrstr = par("address");
+
+    if (!strcmp(addrstr, "auto"))
     {
-        if (!par("duplexMode").boolValue())
-            throw cRuntimeError("Half duplex operation is not supported by EtherMACFullDuplex, use the EtherMAC module for that! (Please enable csmacdSupport on EthernetInterface)");
+        ASSERT(currentState);
 
-        beginSendFrames();
+        // assign automatic address
+        address = MACAddress::generateAutoAddress(currentState->getLastAddress());
+
+        // change module parameter from "auto" to concrete address
+        par("address").setStringValue(address.str().c_str());
+    }
+    else
+    {
+        address.setAddress(addrstr);
     }
 }
 

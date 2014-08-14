@@ -1,3 +1,14 @@
+Parallel INET
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This directory contains a modified version of INET. The purpose of these modifications is
+to allow executing INET models in parallel.
+
+We grant usage of our modifications under the same licenses as INET 2.4.0 is licensed.
+
+Mirko Stoffers, Ralf Bettermann, James Gross, Klaus Wehrle
+RWTH Aachen University, Chair of Communication and Distributed Systems
+
 INET Framework for OMNEST/OMNeT++
 =================================
 

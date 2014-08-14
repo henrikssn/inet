@@ -1,5 +1,6 @@
 //
 // Copyright (C) 2012 Opensim Ltd
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
@@ -64,7 +65,7 @@ void IPv4NodeConfigurator::initialize(int stage)
         if (!nodeStatus || nodeStatus->getState() == NodeStatus::UP)
             prepareNode();
     }
-    else if (stage == 2)
+    else if (stage == 4)
     {
         if ((!nodeStatus || nodeStatus->getState() == NodeStatus::UP) && networkConfigurator)
             configureNode();

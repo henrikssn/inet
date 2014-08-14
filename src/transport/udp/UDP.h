@@ -1,6 +1,7 @@
 //
 // Copyright (C) 2000 Institut fuer Telematik, Universitaet Karlsruhe
 // Copyright (C) 2004-2011 Andras Varga
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
@@ -67,17 +68,22 @@ class INET_API UDP : public cSimpleModule, public ILifecycle
 
     typedef std::list<SockDesc *> SockDescList;   // might contain duplicated local addresses if their reuseAddr flag is set
     typedef std::map<int,SockDesc *> SocketsByIdMap;
+    typedef std::map<std::pair<int,int>,int> LocalSocketIdToSocketIdMap; // A socket is identified by his localUniqueId (unique in the module) and the module id and is mapped to its socketId by UDP. (LocalSocketIdToSocketIdMap) The SocketIds are managed by UDP.
     typedef std::map<int,SockDescList> SocketsByPortMap;
 
   protected:
     // sockets
     SocketsByIdMap socketsByIdMap;
     SocketsByPortMap socketsByPortMap;
+    LocalSocketIdToSocketIdMap localSocketIdToSocketIdMap; // key: map localUniqueId and moduleId to socketId
 
     // other state vars
     ushort lastEphemeralPort;
     ICMP *icmp;
     ICMPv6 *icmpv6;
+
+    //stores the nextSockId, which is used.
+    int nextSockId;
 
     // statistics
     int numSent;
@@ -143,6 +149,9 @@ class INET_API UDP : public cSimpleModule, public ILifecycle
 
     // ILifeCycle:
     virtual bool handleOperationStage(LifecycleOperation *operation, int stage, IDoneCallback *doneCallback);
+
+    //Maps a localUniqueId and a moduleId to a SockId. Generates a sockId if it was not generated before.
+    virtual int getSockId(int localUniqueId,int moduleId);
 
   public:
     UDP();

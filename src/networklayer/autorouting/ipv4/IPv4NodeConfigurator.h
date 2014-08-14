@@ -1,5 +1,6 @@
 //
 // Copyright (C) 2012 Opensim Ltd
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
@@ -58,7 +59,7 @@ class IPv4NodeConfigurator : public cSimpleModule, public ILifecycle {
         IPv4NodeConfigurator();
 
     protected:
-        virtual int numInitStages() const { return 4; }
+        virtual int numInitStages() const { return 5; }
         virtual void handleMessage(cMessage *msg) { throw cRuntimeError("this module doesn't handle messages, it runs only in initialize()"); }
         virtual void initialize(int stage);
         virtual bool handleOperationStage(LifecycleOperation *operation, int stage, IDoneCallback *doneCallback);

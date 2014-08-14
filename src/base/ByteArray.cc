@@ -1,6 +1,7 @@
 //
 // (C) 2005 Vojtech Janota
 // (C) 2010 Zoltan Bojthe
+// (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This library is free software, you can redistribute it
 // and/or modify
@@ -15,6 +16,47 @@
 
 #include "ByteArray.h"
 
+// Another default rule (prevents compiler from choosing base class' doPacking())
+template<typename T>
+void doPacking(cCommBuffer *, T& t) {
+    throw cRuntimeError("Parsim error: no doPacking() function for type %s or its base class (check .msg and _m.cc/h files!)",opp_typename(typeid(t)));
+}
+
+template<typename T>
+void doUnpacking(cCommBuffer *, T& t) {
+    throw cRuntimeError("Parsim error: no doUnpacking() function for type %s or its base class (check .msg and _m.cc/h files!)",opp_typename(typeid(t)));
+}
+
+
+
+template<>
+void doPacking(cCommBuffer *buffer, ByteArray &byteArray) {
+
+    size_t datasize = byteArray.getDataArraySize();
+    buffer->pack(datasize);
+
+    for(size_t i = 0; i < datasize; i++)
+        buffer->pack(byteArray.getData(i));
+    
+
+}
+
+template<>
+void doUnpacking(cCommBuffer *buffer, ByteArray &byteArray) {
+
+    size_t datasize;
+    buffer->unpack(datasize);
+
+    byteArray.setDataArraySize(datasize);
+
+    for(size_t i = 0; i < datasize; i++)
+    {
+        char val;
+        buffer->unpack(val);
+        byteArray.setData(i,val);
+    }
+
+}
 
 void ByteArray::setDataFromBuffer(const void *ptr, unsigned int length)
 {

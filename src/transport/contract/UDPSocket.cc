@@ -1,5 +1,6 @@
 //
 // Copyright (C) 2005,2011 Andras Varga
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
@@ -25,15 +26,18 @@
 
 UDPSocket::UDPSocket()
 {
-    // don't allow user-specified sockIds because they may conflict with
-    // automatically assigned ones.
-    sockId = generateSocketId();
+    sockId = -1;
     gateToUdp = NULL;
 }
 
-int UDPSocket::generateSocketId()
+int UDPSocket::getOrCreateSocketId()
 {
-    return ev.getUniqueNumber();
+    if(sockId == -1)
+    {
+        sockId = check_and_cast<cSimpleModule *>(gateToUdp->getOwnerModule())->getLocalUniqueNumber();
+    }
+
+    return sockId;
 }
 
 void UDPSocket::sendToUDP(cMessage *msg)
@@ -55,7 +59,7 @@ void UDPSocket::bind(IPvXAddress localAddr, int localPort)
         throw cRuntimeError("UDPSocket::bind(): invalid port number %d", localPort);
 
     UDPBindCommand *ctrl = new UDPBindCommand();
-    ctrl->setSockId(sockId);
+    ctrl->setSockId(getOrCreateSocketId());
     ctrl->setLocalAddr(localAddr);
     ctrl->setLocalPort(localPort);
     cMessage *msg = new cMessage("BIND", UDP_C_BIND);
@@ -71,7 +75,7 @@ void UDPSocket::connect(IPvXAddress addr, int port)
         throw cRuntimeError("UDPSocket::connect(): invalid remote port number %d", port);
 
     UDPConnectCommand *ctrl = new UDPConnectCommand();
-    ctrl->setSockId(sockId);
+    ctrl->setSockId(getOrCreateSocketId());
     ctrl->setRemoteAddr(addr);
     ctrl->setRemotePort(port);
     cMessage *msg = new cMessage("CONNECT", UDP_C_CONNECT);
@@ -83,7 +87,7 @@ void UDPSocket::sendTo(cPacket *pk, IPvXAddress destAddr, int destPort, const Se
 {
     pk->setKind(UDP_C_DATA);
     UDPSendCommand *ctrl = new UDPSendCommand();
-    ctrl->setSockId(sockId);
+    ctrl->setSockId(getOrCreateSocketId());
     ctrl->setDestAddr(destAddr);
     ctrl->setDestPort(destPort);
     if (options)
@@ -98,7 +102,7 @@ void UDPSocket::send(cPacket *pk)
 {
     pk->setKind(UDP_C_DATA);
     UDPSendCommand *ctrl = new UDPSendCommand();
-    ctrl->setSockId(sockId);
+    ctrl->setSockId(getOrCreateSocketId());
     pk->setControlInfo(ctrl);
     sendToUDP(pk);
 }
@@ -107,7 +111,7 @@ void UDPSocket::close()
 {
     cMessage *msg = new cMessage("CLOSE", UDP_C_CLOSE);
     UDPCloseCommand *ctrl = new UDPCloseCommand();
-    ctrl->setSockId(sockId);
+    ctrl->setSockId(getOrCreateSocketId());
     msg->setControlInfo(ctrl);
     sendToUDP(msg);
 }
@@ -116,7 +120,7 @@ void UDPSocket::setBroadcast(bool broadcast)
 {
     cMessage *msg = new cMessage("SetBroadcast", UDP_C_SETOPTION);
     UDPSetBroadcastCommand *ctrl = new UDPSetBroadcastCommand();
-    ctrl->setSockId(sockId);
+    ctrl->setSockId(getOrCreateSocketId());
     ctrl->setBroadcast(broadcast);
     msg->setControlInfo(ctrl);
     sendToUDP(msg);
@@ -126,7 +130,7 @@ void UDPSocket::setTimeToLive(int ttl)
 {
     cMessage *msg = new cMessage("SetTTL", UDP_C_SETOPTION);
     UDPSetTimeToLiveCommand *ctrl = new UDPSetTimeToLiveCommand();
-    ctrl->setSockId(sockId);
+    ctrl->setSockId(getOrCreateSocketId());
     ctrl->setTtl(ttl);
     msg->setControlInfo(ctrl);
     sendToUDP(msg);
@@ -136,7 +140,7 @@ void UDPSocket::setTypeOfService(unsigned char tos)
 {
     cMessage *msg = new cMessage("SetTOS", UDP_C_SETOPTION);
     UDPSetTypeOfServiceCommand *ctrl = new UDPSetTypeOfServiceCommand();
-    ctrl->setSockId(sockId);
+    ctrl->setSockId(getOrCreateSocketId());
     ctrl->setTos(tos);
     msg->setControlInfo(ctrl);
     sendToUDP(msg);
@@ -146,7 +150,7 @@ void UDPSocket::setMulticastOutputInterface(int interfaceId)
 {
     cMessage *msg = new cMessage("SetMulticastOutputIf", UDP_C_SETOPTION);
     UDPSetMulticastInterfaceCommand *ctrl = new UDPSetMulticastInterfaceCommand();
-    ctrl->setSockId(sockId);
+    ctrl->setSockId(getOrCreateSocketId());
     ctrl->setInterfaceId(interfaceId);
     msg->setControlInfo(ctrl);
     sendToUDP(msg);
@@ -156,7 +160,7 @@ void UDPSocket::setMulticastLoop(bool value)
 {
     cMessage *msg = new cMessage("SetMulticastLoop", UDP_C_SETOPTION);
     UDPSetMulticastLoopCommand *ctrl = new UDPSetMulticastLoopCommand();
-    ctrl->setSockId(sockId);
+    ctrl->setSockId(getOrCreateSocketId());
     ctrl->setLoop(value);
     msg->setControlInfo(ctrl);
     sendToUDP(msg);
@@ -176,7 +180,7 @@ void UDPSocket::joinMulticastGroup(const IPvXAddress& multicastAddr, int interfa
 {
     cMessage *msg = new cMessage("JoinMulticastGroups", UDP_C_SETOPTION);
     UDPJoinMulticastGroupsCommand *ctrl = new UDPJoinMulticastGroupsCommand();
-    ctrl->setSockId(sockId);
+    ctrl->setSockId(getOrCreateSocketId());
     ctrl->setMulticastAddrArraySize(1);
     ctrl->setMulticastAddr(0, multicastAddr);
     ctrl->setInterfaceIdArraySize(1);
@@ -204,7 +208,7 @@ void UDPSocket::joinLocalMulticastGroups()
     if (numOfAddresses > 0)
     {
         UDPJoinMulticastGroupsCommand *ctrl = new UDPJoinMulticastGroupsCommand();
-        ctrl->setSockId(sockId);
+        ctrl->setSockId(getOrCreateSocketId());
         ctrl->setMulticastAddrArraySize(numOfAddresses);
         ctrl->setInterfaceIdArraySize(numOfAddresses);
 
@@ -240,7 +244,7 @@ void UDPSocket::leaveMulticastGroup(const IPvXAddress& multicastAddr)
 {
     cMessage *msg = new cMessage("LeaveMulticastGroups", UDP_C_SETOPTION);
     UDPLeaveMulticastGroupsCommand *ctrl = new UDPLeaveMulticastGroupsCommand();
-    ctrl->setSockId(sockId);
+    ctrl->setSockId(getOrCreateSocketId());
     ctrl->setMulticastAddrArraySize(1);
     ctrl->setMulticastAddr(0, multicastAddr);
     msg->setControlInfo(ctrl);
@@ -266,7 +270,7 @@ void UDPSocket::leaveLocalMulticastGroups()
     if (numOfAddresses > 0)
     {
         UDPLeaveMulticastGroupsCommand *ctrl = new UDPLeaveMulticastGroupsCommand();
-        ctrl->setSockId(sockId);
+        ctrl->setSockId(getOrCreateSocketId());
         ctrl->setMulticastAddrArraySize(numOfAddresses);
 
         unsigned int k = 0;
@@ -297,6 +301,12 @@ void UDPSocket::leaveLocalMulticastGroups()
 
 bool UDPSocket::belongsToSocket(cMessage *msg)
 {
+
+    if(sockId == -1)
+    {
+        return false;
+    }
+
     return dynamic_cast<UDPControlInfo *>(msg->getControlInfo()) &&
            ((UDPControlInfo *)(msg->getControlInfo()))->getSockId()==sockId;
 }

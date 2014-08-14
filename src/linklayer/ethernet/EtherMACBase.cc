@@ -1,4 +1,5 @@
 //
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 // Copyright (C) 2006 Levente Meszaros
 // Copyright (C) 2004 Andras Varga
 //
@@ -165,6 +166,8 @@ void EtherMACBase::initialize(int stage)
 
     if (stage == 0)
     {
+		connected = false;
+
         physInGate = gate("phys$i");
         physOutGate = gate("phys$o");
         upperLayerInGate = gate("upperLayerIn");
@@ -502,7 +505,6 @@ void EtherMACBase::readChannelParameters(bool errorWhenAsymmetric)
     cDatarateChannel *outTrChannel = check_and_cast_nullable<cDatarateChannel *>(physOutGate->findTransmissionChannel());
     cDatarateChannel *inTrChannel = check_and_cast_nullable<cDatarateChannel *>(physInGate->findIncomingTransmissionChannel());
 
-    connected = physOutGate->getPathEndGate()->isConnected() && physInGate->getPathStartGate()->isConnected();
 
     if (connected && ((!outTrChannel) || (!inTrChannel)))
         throw cRuntimeError("Ethernet phys gate must be connected using a transmission channel");

@@ -1,5 +1,6 @@
 //
 // Copyright (C) 2013 Opensim Ltd.
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
@@ -182,7 +183,7 @@ class INET_API RIPRouting : public cSimpleModule, public INotifiable, public ILi
     std::string getHostName() {return host->getFullName(); }
     int getInterfaceMetric(InterfaceEntry *ie);
   protected:
-    virtual int numInitStages() const { return 5; }
+    virtual int numInitStages() const { return 6; }
     virtual void initialize(int stage);
     virtual void handleMessage(cMessage *msg);
     virtual void receiveChangeNotification(int category, const cObject *details);

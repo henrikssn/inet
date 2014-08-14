@@ -1,5 +1,6 @@
 //
 // Copyright (C) 2005 Andras Varga
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -26,6 +27,7 @@
 #include "InterfaceEntry.h"
 
 #include "IInterfaceTable.h"
+#include "InterfaceTable.h"
 
 #ifdef WITH_IPv4
 #include "IPv4InterfaceData.h"
@@ -165,7 +167,17 @@ std::string InterfaceEntry::detailedInfo() const
 }
 std::string InterfaceEntry::getFullPath() const
 {
-    return ownerp == NULL ? getFullName() : ownerp->getHostModule()->getFullPath() + "." + getFullName();
+    if(!interfaceModule->isPlaceholder())
+    {
+        return ownerp == NULL ? getFullName() : ownerp->getHostModule()->getFullPath() + "." + getFullName();
+    }
+    else
+    {
+        std::string s = interfaceModule->getFullPath();
+        return s.substr(0,s.find_last_of(".")) + "." + getFullName();
+    }
+
+
 }
 
 void InterfaceEntry::changed(int category, int fieldId)

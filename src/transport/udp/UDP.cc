@@ -1,6 +1,7 @@
 //
 // Copyright (C) 2000 Institut fuer Telematik, Universitaet Karlsruhe
 // Copyright (C) 2004-2011 Andras Varga
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
@@ -128,6 +129,8 @@ void UDP::initialize(int stage)
         icmp = NULL;
         icmpv6 = NULL;
 
+        nextSockId = 0;
+
         numSent = 0;
         numPassedUp = 0;
         numDroppedWrongPort = 0;
@@ -188,28 +191,53 @@ void UDP::updateDisplayString()
     getDisplayString().setTagArg("t", 0, buf);
 }
 
+int UDP::getSockId(int localUniqueId,int moduleId)
+{
+    std::pair<int,int> pair;
+    pair.first = localUniqueId;
+    pair.second = moduleId;
+
+    //was the socket created earlier
+    LocalSocketIdToSocketIdMap::iterator it = localSocketIdToSocketIdMap.find(pair);
+    if (it != localSocketIdToSocketIdMap.end())
+    {
+        return it->second;
+    }
+
+    int sockId = nextSockId++;
+
+    //add the new id to the Map
+    localSocketIdToSocketIdMap[pair] = sockId;
+
+    return sockId;
+}
+
 void UDP::processCommandFromApp(cMessage *msg)
 {
     switch (msg->getKind())
     {
         case UDP_C_BIND: {
             UDPBindCommand *ctrl = check_and_cast<UDPBindCommand*>(msg->getControlInfo());
-            bind(ctrl->getSockId(), msg->getArrivalGate()->getIndex(), ctrl->getLocalAddr(), ctrl->getLocalPort());
+            int sockId = getSockId(ctrl->getSockId(),msg->getSenderModule()->getId());
+            bind(sockId, msg->getArrivalGate()->getIndex(), ctrl->getLocalAddr(), ctrl->getLocalPort());
             break;
         }
         case UDP_C_CONNECT: {
             UDPConnectCommand *ctrl = check_and_cast<UDPConnectCommand*>(msg->getControlInfo());
-            connect(ctrl->getSockId(), msg->getArrivalGate()->getIndex(), ctrl->getRemoteAddr(), ctrl->getRemotePort());
+            int sockId = getSockId(ctrl->getSockId(),msg->getSenderModule()->getId());
+            connect(sockId, msg->getArrivalGate()->getIndex(), ctrl->getRemoteAddr(), ctrl->getRemotePort());
             break;
         }
         case UDP_C_CLOSE: {
             UDPCloseCommand *ctrl = check_and_cast<UDPCloseCommand*>(msg->getControlInfo());
-            close(ctrl->getSockId());
+            int sockId = getSockId(ctrl->getSockId(),msg->getSenderModule()->getId());
+            close(sockId);
             break;
         }
         case UDP_C_SETOPTION: {
             UDPSetOptionCommand *ctrl = check_and_cast<UDPSetOptionCommand *>(msg->getControlInfo());
-            SockDesc *sd = getOrCreateSocket(ctrl->getSockId(), msg->getArrivalGate()->getIndex());
+            int sockId = getSockId(ctrl->getSockId(),msg->getSenderModule()->getId());
+            SockDesc *sd = getOrCreateSocket(sockId, msg->getArrivalGate()->getIndex());
 
             if (dynamic_cast<UDPSetTimeToLiveCommand*>(ctrl))
                 setTimeToLive(sd, ((UDPSetTimeToLiveCommand*)ctrl)->getTtl());
@@ -258,7 +286,8 @@ void UDP::processPacketFromApp(cPacket *appData)
 {
     UDPSendCommand *ctrl = check_and_cast<UDPSendCommand *>(appData->removeControlInfo());
 
-    SockDesc *sd = getOrCreateSocket(ctrl->getSockId(), appData->getArrivalGate()->getIndex());
+    int sockId = getSockId(ctrl->getSockId(),appData->getSenderModule()->getId());
+    SockDesc *sd = getOrCreateSocket(sockId, appData->getArrivalGate()->getIndex());
     const IPvXAddress& destAddr = ctrl->getDestAddr().isUnspecified() ? sd->remoteAddr : ctrl->getDestAddr();
     int destPort = ctrl->getDestPort() == -1 ? sd->remotePort : ctrl->getDestPort();
     if (destAddr.isUnspecified() || destPort == -1)

@@ -1,5 +1,6 @@
 //
 // Copyright (C) 2006 Levente Meszaros
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
@@ -21,6 +22,7 @@
 #include "INETDefs.h"
 
 #include "EtherMACBase.h"
+#include "EtherMACState.h"
 
 /**
  * A simplified version of EtherMAC. Since modern Ethernets typically
@@ -34,9 +36,11 @@ class INET_API EtherMACFullDuplex : public EtherMACBase
     EtherMACFullDuplex();
 
   protected:
-    virtual void initialize(int stage);
+    virtual cState& initialize(int stage, cState &state);
+    virtual int numInitStages() const  {return 3;}
     virtual void initializeStatistics();
     virtual void initializeFlags();
+    virtual void initializeMACAddress();
     virtual void handleMessage(cMessage *msg);
 
     // finish
@@ -61,6 +65,9 @@ class INET_API EtherMACFullDuplex : public EtherMACBase
 
     // statistics
     simtime_t totalSuccessfulRxTime; // total duration of successful transmissions on channel
+
+    //internal
+    EtherMACState *currentState;
 };
 
 #endif

@@ -1,5 +1,6 @@
 //
 // Copyright (C) 2013 Opensim Ltd.
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
@@ -189,7 +190,7 @@ void RIPRouting::initialize(int stage)
         WATCH_VECTOR(ripInterfaces);
         WATCH_PTRVECTOR(ripRoutes);
     }
-    else if (stage == 4)
+    else if (stage == 6)
     { // interfaces and static routes are already initialized
         NodeStatus *nodeStatus = dynamic_cast<NodeStatus *>(findContainingNode(this)->getSubmodule("status"));
         isOperational = !nodeStatus || nodeStatus->getState() == NodeStatus::UP;

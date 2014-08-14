@@ -1,5 +1,6 @@
 //
 // Copyright (C) 2012 Opensim Ltd.
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
@@ -15,7 +16,7 @@
 // along with this program; if not, see <http://www.gnu.org/licenses/>.
 //
 //
-// Authors: Levente Meszaros (primary author), Andras Varga, Tamas Borbely
+// Authors: Levente Meszaros (primary author), Andras Varga, Tamas Borbely, Ralf Bettermann
 //
 
 package inet.networklayer.autorouting.ipv4;
@@ -371,4 +372,10 @@ simple IPv4NetworkConfigurator
         bool dumpAddresses = default(false); // print assigned IP addresses for all interfaces to the module output
         bool dumpRoutes = default(false);    // print configured and optimized routing tables for all nodes to the module output
         string dumpConfig = default("");     // write configuration into the given config file that can be fed back to speed up subsequent runs (network configurations)
+
+        bool storeHostAddresses = default(false); //configurator stores the addresses of the hosts which were specified in the config file
+        string hostNameToBeStored = default("udpApp"); //name of the host which should be added 
+        bool dumpCollectedHostsAdresses = default(false); //dumps the colleceted addresses into EV
+        bool disabled = default(false);
+		
 }

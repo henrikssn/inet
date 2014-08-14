@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2003 Andras Varga; CTIE, Monash University, Australia
+ * Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
@@ -195,6 +196,13 @@ class INET_API MACAddress
      */
     static MACAddress generateAutoAddress();
 
+
+    /**
+     * Generates a unique address from the last assigned address.
+     * Used by distributed initalization to assign auto addresses on different LPs. 
+     */
+    static MACAddress generateAutoAddress(unsigned int &lastUsedAddress);
+
     /**
      * Form a MAC address for a multicast IPv4 address, see  RFC 1112, section 6.4
      */
@@ -209,5 +217,8 @@ inline std::ostream& operator<<(std::ostream& os, const MACAddress& mac)
 {
     return os << mac.str();
 }
+
+void doPacking(cCommBuffer *buffer, MACAddress &addr);
+void doUnpacking(cCommBuffer *buffer, MACAddress &addr);
 
 #endif

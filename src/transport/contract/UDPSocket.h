@@ -1,5 +1,6 @@
 //
 // Copyright (C) 2005,2011 Andras Varga
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
@@ -91,9 +92,10 @@ class INET_API UDPSocket
     int getSocketId() const  {return sockId;}
 
     /**
-     * Generates a new socket id.
+     * Generates a new sockId if sockId = -1.
+     * In the other case it just returns the sockId.
      */
-    static int generateSocketId();
+    int getOrCreateSocketId();
 
     /** @name Opening and closing connections, sending data */
     //@{

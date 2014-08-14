@@ -1,5 +1,6 @@
 //
 // Copyright (C) 2005 Andras Varga
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -54,6 +55,7 @@ InterfaceTable::InterfaceTable()
     nb = NULL;
     tmpNumInterfaces = -1;
     tmpInterfaceList = NULL;
+    dummyInterfaceTable = false;
 }
 
 InterfaceTable::~InterfaceTable()
@@ -62,6 +64,32 @@ InterfaceTable::~InterfaceTable()
         delete idToInterface[i];
     delete [] tmpInterfaceList;
 }
+
+void InterfaceTable::setDummyInterfaceTable(bool dummy)
+{
+    this->dummyInterfaceTable = dummy;
+}
+bool InterfaceTable::isDummyInterfaceTable()
+{
+    return this->dummyInterfaceTable;
+}
+void InterfaceTable::setHostModuleFullPath(std::string fullpath)
+{
+    this->hostModuleFullPath = fullpath;
+}
+std::string InterfaceTable::getHostModuleFullPath()
+{
+    return hostModuleFullPath;
+}
+void InterfaceTable::setHostModuleId(int moduleid)
+{
+    this->hostModuleId = moduleid;
+}
+int InterfaceTable::getHostModuleId()
+{
+    return hostModuleId;
+}
+
 
 void InterfaceTable::initialize(int stage)
 {
@@ -242,11 +270,14 @@ int InterfaceTable::getBiggestInterfaceId()
 
 void InterfaceTable::addInterface(InterfaceEntry *entry)
 {
-    if (!nb)
-        throw cRuntimeError("InterfaceTable must precede all network interface modules in the node's NED definition");
-    // check name is unique
-    if (getInterfaceByName(entry->getName())!=NULL)
-        throw cRuntimeError("addInterface(): interface '%s' already registered", entry->getName());
+    if(!dummyInterfaceTable) //ignore errors if dummy Interface
+    {
+        if (!nb)
+                throw cRuntimeError("InterfaceTable must precede all network interface modules in the node's NED definition");
+            // check name is unique
+            if (getInterfaceByName(entry->getName())!=NULL)
+                throw cRuntimeError("addInterface(): interface '%s' already registered", entry->getName());
+    }
 
     // insert
     entry->setInterfaceId(INTERFACEIDS_START + idToInterface.size());
@@ -254,10 +285,12 @@ void InterfaceTable::addInterface(InterfaceEntry *entry)
     idToInterface.push_back(entry);
     invalidateTmpInterfaceList();
 
-    // fill in networkLayerGateIndex, nodeOutputGateId, nodeInputGateId
-    discoverConnectingGates(entry);
-
-    nb->fireChangeNotification(NF_INTERFACE_CREATED, entry);
+    if(!dummyInterfaceTable)
+    {
+        // fill in networkLayerGateIndex, nodeOutputGateId, nodeInputGateId
+        discoverConnectingGates(entry);
+        nb->fireChangeNotification(NF_INTERFACE_CREATED, entry);
+    }
 }
 
 void InterfaceTable::discoverConnectingGates(InterfaceEntry *entry)
@@ -342,6 +375,8 @@ void InterfaceTable::invalidateTmpInterfaceList()
 
 void InterfaceTable::interfaceChanged(int category, const InterfaceEntryChangeDetails *details)
 {
+    if(this->isDummyInterfaceTable()) return; //ignore call if dummy interface table
+
     Enter_Method_Silent();
 
     nb->fireChangeNotification(category, details);

@@ -1,5 +1,6 @@
 //
 // Copyright (C) 2012 Opensim Ltd
+// Copyright (C) 2014 RWTH Aachen University, Chair of Communication and Distributed Systems
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
@@ -15,7 +16,7 @@
 // along with this program; if not, see <http://www.gnu.org/licenses/>.
 //
 //
-// Authors: Levente Meszaros (primary author), Andras Varga, Tamas Borbely
+// Authors: Levente Meszaros (primary author), Andras Varga, Tamas Borbely, Ralf Bettermann
 //
 
 #ifndef __INET_IPV4CONFIGURATOR_H
@@ -31,6 +32,8 @@
 #include "IPvXAddressResolver.h"
 #include "IPv4InterfaceData.h"
 #include "PatternMatcher.h"
+#include "IPv4NetworkConfiguratorState.h"
+#include "RoutingTable.h"
 
 
 /**
@@ -42,9 +45,16 @@
 // TODO: remove topology arguments from functions or perhaps move those functions into topology or leave it as it is?
 class INET_API IPv4NetworkConfigurator : public cSimpleModule, public IPvXAddressResolver
 {
-    protected:
+    public:
         class LinkInfo;
         class InterfaceInfo;
+
+        int getNetworkAddress(int hostAddress);
+        std::vector<IPv4Address> getNotLocalAddresses(int networkAddress);
+        std::vector<IPv4Address> getLocalAddresses(int networkAddress);
+
+        IPv4NetworkConfigurator(){ipv4configuratorState=NULL;}
+
 
         /**
          * Represents a node in the network.
@@ -79,6 +89,8 @@ class INET_API IPv4NetworkConfigurator : public cSimpleModule, public IPvXAddres
          */
         class InterfaceInfo : public cObject {
             public:
+                bool isDummy;
+
                 Node *node;
                 LinkInfo *linkInfo;
                 InterfaceEntry *interfaceEntry;
@@ -108,6 +120,8 @@ class INET_API IPv4NetworkConfigurator : public cSimpleModule, public IPvXAddres
          */
         class LinkInfo : public cObject {
             public:
+                bool isDummy;
+
                 std::vector<InterfaceInfo *> interfaceInfos; // interfaces on that LAN or point-to-point link
                 InterfaceInfo* gatewayInterfaceInfo; // non-NULL if all hosts have 1 non-loopback interface except one host that has two of them (this will be the gateway)
 
@@ -202,6 +216,15 @@ class INET_API IPv4NetworkConfigurator : public cSimpleModule, public IPvXAddres
         bool optimizeRoutesParameter;
         cXMLElement *configuration;
 
+        bool storeHostAddressesParameter;
+        const char* hostNameToBeStoredParameter;
+        IPv4NetworkConfiguratorState* ipv4configuratorState;
+
+        std::map<int,std::vector<int> >networkAddressMap;
+        std::map<InterfaceInfo*,int>interfaceNetworkAddressMap;
+        std::map<int,int>addressNetworkAddressMap;
+
+
         // internal state
         IPv4Topology topology;
 
@@ -210,7 +233,7 @@ class INET_API IPv4NetworkConfigurator : public cSimpleModule, public IPvXAddres
          * Computes the IPv4 network configuration for all nodes in the network.
          * The result of the computation is only stored in the network configurator.
          */
-        virtual void computeConfiguration();
+        virtual void computeConfiguration(IPv4NetworkConfiguratorState* state);
 
         /**
          * Configures all interfaces in the network based on the current network configuration.
@@ -233,16 +256,16 @@ class INET_API IPv4NetworkConfigurator : public cSimpleModule, public IPvXAddres
         virtual void configureRoutingTable(IRoutingTable *routingTable);
 
     protected:
-        virtual int numInitStages() const  { return 4; }
+        virtual int numInitStages() const  { return 5; }
         virtual void handleMessage(cMessage *msg) { throw cRuntimeError("this module doesn't handle messages, it runs only in initialize()"); }
-        virtual void initialize(int stage);
+        virtual cState& initialize(int stage, cState& state);
 
         /**
          * Extracts network topology by walking through the module hierarchy.
          * Creates vertices from modules having @node property.
          * Creates edges from connections (wired and wireless) between network interfaces.
          */
-        virtual void extractTopology(IPv4Topology& topology);
+        virtual void extractTopology(IPv4Topology& topology, IPv4NetworkConfiguratorState *state);
 
         /**
          * Reads interface elements from the configuration file and stores result.
@@ -300,6 +323,10 @@ class INET_API IPv4NetworkConfigurator : public cSimpleModule, public IPvXAddres
         virtual void dumpRoutes(IPv4Topology& topology);
         virtual void dumpConfig(IPv4Topology& topology);
 
+        /**
+         * Used by parallel initialization to distribute the interfaces of the local modules
+         */
+        void distributeInterfaces(IPv4NetworkConfiguratorState *currentState);
         // helper functions
         virtual void extractWiredNeighbors(IPv4Topology& topology, Topology::LinkOut *linkOut, LinkInfo* linkInfo, std::set<InterfaceEntry *>& interfacesSeen, std::vector<Node *>& nodesVisited);
         virtual void extractWirelessNeighbors(IPv4Topology& topology, const char *wirelessId, LinkInfo* linkInfo, std::set<InterfaceEntry *>& interfacesSeen, std::vector<Node *>& nodesVisited);
@@ -312,6 +339,7 @@ class INET_API IPv4NetworkConfigurator : public cSimpleModule, public IPvXAddres
         virtual InterfaceInfo *createInterfaceInfo(IPv4Topology& topology, Node *node, LinkInfo *linkInfo, InterfaceEntry *interfaceEntry);
         virtual void parseAddressAndSpecifiedBits(const char *addressAttr, uint32_t& outAddress, uint32_t& outAddressSpecifiedBits);
         virtual bool linkContainsMatchingHostExcept(LinkInfo *linkInfo, Matcher *hostMatcher, cModule *exceptModule);
+        virtual bool linkContainsMatchingHostExcept(LinkInfo *linkInfo, Matcher *hostMatcher, int exceptModuleId);
         virtual const char *getMandatoryAttribute(cXMLElement *element, const char *attr);
         virtual void resolveInterfaceAndGateway(Node *node, const char *interfaceAttr, const char *gatewayAttr, InterfaceEntry *&outIE, IPv4Address& outGateway, IPv4Topology& topology);
         virtual InterfaceInfo *findInterfaceOnLinkByNode(LinkInfo *linkInfo, cModule *node);

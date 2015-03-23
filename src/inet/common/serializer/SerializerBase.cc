@@ -255,6 +255,32 @@ void SerializerBase::serializePacket(const cPacket *pkt, Buffer &b, Context& c)
     serialize(pkt, b, c);
     if (!b.hasError() && (b.getPos() - startPos != pkt->getByteLength()))
         throw cRuntimeError("%s serializer error: packet %s (%s) length is %d but serialized length is %d", getClassName(), pkt->getName(), pkt->getClassName(), pkt->getByteLength(), b.getPos() - startPos);
+#if 0
+    Buffer b1(b._getBuf() + startPos, b.getPos() - startPos);
+    Context c1(c);
+    cPacket *deserialized = deserialize(b1, c1);
+    if (deserialized) {
+        int64 length = b.hasError() ? b.getPos() - startPos : pkt->getByteLength();
+        if (length != deserialized->getByteLength()) {
+            Buffer bx(b._getBuf() + startPos, b.getPos() - startPos);
+            Context cx(c);
+            cPacket *deserialized = deserialize(bx, cx);
+            throw cRuntimeError("%s serializer error: packet %s (%s) length is %d, serialized-deserialized length is %d", getClassName(), pkt->getName(), pkt->getClassName(), pkt->getByteLength(), deserialized->getByteLength());
+        }
+        char *buffer2 = new char[length];
+        Buffer b2(buffer2, length);
+        Context c2(c);
+        serialize(deserialized, b2, c2);
+        if (memcmp(b._getBuf() + startPos, buffer2, length)) {
+            Buffer bx(buffer2, length);
+            Context cx(c);
+            serialize(deserialized, bx, cx);
+            throw cRuntimeError("%s serializer error: packet %s (%s) length is %d, serialized and serialized-deserialized-serialized contents are differ", getClassName(), pkt->getName(), pkt->getClassName(), pkt->getByteLength(), deserialized->getByteLength());
+        }
+        delete[] buffer2;
+        delete deserialized;
+    }
+#endif
 }
 
 cPacket *SerializerBase::deserializePacket(Buffer &b, Context& context)

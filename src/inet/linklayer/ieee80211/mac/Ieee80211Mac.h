@@ -668,6 +668,8 @@ class INET_API Ieee80211Mac : public MACProtocolBase
 
     virtual void sendUp(cMessage *msg) override;
 
+    virtual void sendDown(cMessage *message) override;
+
     virtual void removeOldTuplesFromDuplicateMap();
 
     virtual void promiscousFrame(cMessage *msg);

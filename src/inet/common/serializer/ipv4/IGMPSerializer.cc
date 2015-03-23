@@ -121,6 +121,10 @@ void IGMPSerializer::serialize(const cPacket *_pkt, Buffer &b, Context& context)
             throw cRuntimeError("Can not serialize IGMP packet (%s): type %d not supported.", pkt->getClassName(), pkt->getType());
     }
     b.writeUint16To(2, TCPIPchecksum::checksum(igmp, b.getPos() - startPos));
+
+
+
+    ASSERT(b.getPos() - startPos == _pkt->getByteLength());
 }
 
 cPacket *IGMPSerializer::deserialize(Buffer &b, Context& c)
@@ -220,6 +224,7 @@ cPacket *IGMPSerializer::deserialize(Buffer &b, Context& c)
 
         default:
             EV_ERROR << "IGMPSerializer: can not create IGMP packet: type " << type << " not supported\n";
+            ASSERT(0);
             b.seek(startPos);
             packet = SerializerRegistrationList::byteArraySerializer.deserializePacket(b, c);
             packet->setBitError(true);

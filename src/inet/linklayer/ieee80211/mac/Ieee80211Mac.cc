@@ -26,6 +26,8 @@
 #include "inet/common/INETUtils.h"
 #include "inet/common/ModuleAccess.h"
 
+#include "inet/common/serializer/SerializerBase.h"
+
 namespace inet {
 
 namespace ieee80211 {
@@ -2679,6 +2681,26 @@ void Ieee80211Mac::configureRadioMode(IRadio::RadioMode radioMode)
         message->setControlInfo(configureCommand);
         sendDown(message);
     }
+}
+
+void Ieee80211Mac::sendDown(cMessage *message)
+{
+//    Ieee80211Frame *frame = dynamic_cast<Ieee80211Frame *>(message);
+//    if (frame) {
+//        using namespace serializer;
+//        int64 length = frame->getByteLength();
+//        char *buffer = new char[length];
+//        Buffer b(buffer, length);
+//        Context c;
+//        c.throwOnSerializerNotFound = false;
+//        SerializerBase::lookupAndSerialize(frame, b, c, LINKTYPE, LINKTYPE_IEEE802_11, 0);
+//        b.seek(0);
+//        cPacket *deserialized = SerializerBase::lookupAndDeserialize(b, c, LINKTYPE, LINKTYPE_IEEE802_11, 0);
+//        ASSERT(deserialized);
+//        ASSERT(deserialized->getByteLength() == length);
+//        delete[] buffer;
+//    }
+    MACProtocolBase::sendDown(message);
 }
 
 } // namespace ieee80211

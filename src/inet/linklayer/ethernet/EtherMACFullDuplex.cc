@@ -120,12 +120,41 @@ void EtherMACFullDuplex::startFrameTransmission()
     frame->addByteLength(PREAMBLE_BYTES + SFD_BYTES);
 
     // send
+#if 1
+    {
+        using namespace serializer;
+        int64 length = frame->getByteLength();
+        char *buffer = new char[length];
+        Buffer b(buffer, length);
+        Context c;
+        c.throwOnSerializerNotFound = false;
+        SerializerBase::lookupAndSerialize(frame, b, c, LINKTYPE, LINKTYPE_ETHERNET, 0);
+        delete[] buffer;
+    }
+#endif
     EV_INFO << "Transmission of " << frame << " started.\n";
-    send(frame, physOutGate);
+#if 0
+    if (par("sendSerializedPacket")) {
+        using namespace serializer;
+        char * bytes = new char[frame->getByteLength()];
+        Buffer b(bytes, frame->getByteLength());
+        Context c;
+        c.throwOnSerializerNotFound = false;
+        EthernetSerializer().serializePacket(frame, b, c);
+        RawPacket *pk = new RawPacket(frame->getName());
+        pk->setDataFromBuffer(bytes, b.getPos());
+        pk->setByteLength(pk->getByteArray().getDataArraySize());
+        delete frame;
+        send(pk, physOutGate);
+    } else
+#endif
+        send(frame, physOutGate);
 
     scheduleAt(transmissionChannel->getTransmissionFinishTime(), endTxMsg);
     transmitState = TRANSMITTING_STATE;
 }
+
+
 
 void EtherMACFullDuplex::processFrameFromUpperLayer(EtherFrame *frame)
 {

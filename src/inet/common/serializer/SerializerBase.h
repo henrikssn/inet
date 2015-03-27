@@ -77,6 +77,7 @@ class INET_API Buffer
     MACAddress readMACAddress() const;
     IPv4Address readIPv4Address() const  { return IPv4Address(readUint32()); }
     IPv6Address readIPv6Address() const;
+    simtime_t readTimeRaw64() const  { simtime_t t; t.setRaw(readUint64()); return t; }
 
     // write
     void writeByte(unsigned char data);
@@ -92,6 +93,7 @@ class INET_API Buffer
     void writeMACAddress(const MACAddress& addr);
     void writeIPv4Address(IPv4Address addr)  { writeUint32(addr.getInt()); }
     void writeIPv6Address(const IPv6Address &addr)  { for (int i = 0; i < 4; i++) { writeUint32(addr.words()[i]); } }
+    void writeTimeRaw64(const simtime_t& t)  { writeUint64(t.raw()); }
 
     // read/write
     void *accessNBytes(unsigned int length);    // returns nullptr when haven't got enough space

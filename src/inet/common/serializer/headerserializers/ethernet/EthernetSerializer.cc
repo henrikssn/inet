@@ -33,10 +33,17 @@ namespace serializer {
 
 Register_Serializer(EtherFrame, LINKTYPE, LINKTYPE_ETHERNET, EthernetSerializer);
 
+static uint8_t PREAMBLE[] = {0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0xD5};
+
 void EthernetSerializer::serialize(const cPacket *pkt, Buffer &b, Context& c)
 {
     ASSERT(b.getPos() == 0);
     const EtherFrame *ethPkt = check_and_cast<const EtherFrame *>(pkt);
+    if (ethPkt->getFrameByteLength() + 8 == ethPkt->getByteLength()) {
+        // Ethernet frame on net, with preamble and SFD
+        b.writeNBytes(sizeof(PREAMBLE), PREAMBLE);
+    }
+    unsigned int startPos = b.getPos();
     b.writeMACAddress(ethPkt->getDest());
     b.writeMACAddress(ethPkt->getSrc());
     if (dynamic_cast<const EthernetIIFrame *>(pkt)) {
@@ -86,23 +93,29 @@ void EthernetSerializer::serialize(const cPacket *pkt, Buffer &b, Context& c)
         throw cRuntimeError("Serializer not found for '%s'", pkt->getClassName());
     }
     if (b.getPos() + 4 < pkt->getByteLength())
-        b.fillNBytes(pkt->getByteLength() - b.getPos() -4 , 0);
-    uint32_t fcs = ethernetCRC(b._getBuf(), b.getPos());
+        b.fillNBytes((pkt->getByteLength() - 4) - b.getPos(), 0);
+    uint32_t fcs = ethernetCRC(b._getBuf() + startPos, b.getPos() - startPos);
     b.writeUint32(fcs);
 }
 
 cPacket* EthernetSerializer::deserialize(Buffer &b, Context& c)
 {
-
     ASSERT(b.getPos() == 0);
+    bool withPreamble = false;
 
     //FIXME should detect and create the real packet type.
     EthernetIIFrame *etherPacket = new EthernetIIFrame;
+    if (b.getRemainder() > sizeof(PREAMBLE)) {
+        if (!memcmp(b.accessNBytes(0), PREAMBLE, sizeof(PREAMBLE))) {
+            withPreamble = true;
+            b.accessNBytes(sizeof(PREAMBLE));
+        }
+    }
 
     etherPacket->setDest(b.readMACAddress());
     etherPacket->setSrc(b.readMACAddress());
     etherPacket->setEtherType(b.readUint16());
-    etherPacket->setByteLength(ETHER_MAC_FRAME_BYTES);
+    etherPacket->setByteLength(b.getPos() + 4); // +4 for trailing crc
 
     cPacket *encapPacket = SerializerBase::lookupAndDeserialize(b, c, ETHERTYPE, etherPacket->getEtherType(), 4);
     ASSERT(encapPacket);
@@ -118,6 +131,7 @@ cPacket* EthernetSerializer::deserialize(Buffer &b, Context& c)
     EV_DEBUG << "Calculated FCS: " << calculatedFcs << ", received FCS: " << receivedFcs << endl;
     if (receivedFcs != calculatedFcs)
         etherPacket->setBitError(true);
+    etherPacket->setFrameByteLength(withPreamble ? etherPacket->getByteLength() - sizeof(PREAMBLE) : etherPacket->getByteLength());
     return etherPacket;
 }
 

@@ -1,0 +1,13 @@
+INET Wireless Tutorial
+======================
+
+The INET Wireless Tutorial contains a series of simulation models numbered 
+1 through 16. The models are of increasing complexity -- they start from the 
+basics and introduce new INET features and concepts related to wireless 
+communication networks.
+
+Each model is self-contained, with its number in the file names, so e.g.
+Wireless03.ned contains all the necessary NED definitions. (The omnetpp.ini 
+file is shared among all simulation steps). It is recommended read the 
+comments of the corresponding NED file first to understand what the
+given step is supposed to demonstrate.

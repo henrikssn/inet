@@ -255,27 +255,51 @@ void SerializerBase::serializePacket(const cPacket *pkt, Buffer &b, Context& c)
     serialize(pkt, b, c);
     if (!b.hasError() && (b.getPos() - startPos != pkt->getByteLength()))
         throw cRuntimeError("%s serializer error: packet %s (%s) length is %d but serialized length is %d", getClassName(), pkt->getName(), pkt->getClassName(), pkt->getByteLength(), b.getPos() - startPos);
-#if 0
+
+#if 1   //DEBUG only
     Buffer b1(b._getBuf() + startPos, b.getPos() - startPos);
     Context c1(c);
     cPacket *deserialized = deserialize(b1, c1);
     if (deserialized) {
-        int64 length = b.hasError() ? b.getPos() - startPos : pkt->getByteLength();
-        if (length != deserialized->getByteLength()) {
-            Buffer bx(b._getBuf() + startPos, b.getPos() - startPos);
-            Context cx(c);
-            cPacket *deserialized = deserialize(bx, cx);
-            throw cRuntimeError("%s serializer error: packet %s (%s) length is %d, serialized-deserialized length is %d", getClassName(), pkt->getName(), pkt->getClassName(), pkt->getByteLength(), deserialized->getByteLength());
+        std::ostringstream to, td;
+        for (const cPacket *p = pkt; p; p = p->getEncapsulatedPacket()) {
+            to << p->getClassName() << "(" << p->getByteLength() << ")/";
         }
-        char *buffer2 = new char[length];
+        for (const cPacket *p = deserialized; p; p = p->getEncapsulatedPacket()) {
+            td << p->getClassName() << "(" << p->getByteLength() << ")/";
+        }
+        int64 length = b.hasError() ? b.getPos() - startPos : pkt->getByteLength();
+        const cPacket *po = pkt, *pd = deserialized;
+        while (po && pd) {
+            if ((po->getByteLength() != pd->getByteLength())) {
+                Buffer bx(b._getBuf() + startPos, b.getPos() - startPos);
+                Context cx(c);
+                cPacket *deserialized2 = deserialize(bx, cx);
+                throw cRuntimeError("%s serializer error: packet %s (%s) and serialized-deserialized (%s) length are differ at %s:%s", getClassName(), pkt->getName(), to.str().c_str(), td.str().c_str(), po->getClassName(), pd->getClassName());
+            }
+            po = po->getEncapsulatedPacket();
+            pd = pd->getEncapsulatedPacket();
+        }
+        unsigned char *buffer2 = new unsigned char[length];
         Buffer b2(buffer2, length);
         Context c2(c);
         serialize(deserialized, b2, c2);
-        if (memcmp(b._getBuf() + startPos, buffer2, length)) {
-            Buffer bx(buffer2, length);
-            Context cx(c);
-            serialize(deserialized, bx, cx);
-            throw cRuntimeError("%s serializer error: packet %s (%s) length is %d, serialized and serialized-deserialized-serialized contents are differ", getClassName(), pkt->getName(), pkt->getClassName(), pkt->getByteLength(), deserialized->getByteLength());
+        int64_t n;
+        for (n = 0; n < length; n++) {
+            if (b._getBuf()[startPos + n] != buffer2[n]) {
+                Buffer bx(buffer2, length);
+                Context cx(c);
+                serialize(deserialized, bx, cx);
+                for (int i = 0; i < length; i++) {
+                    if (i % 16 == 0)
+                        std::cout << std::endl;
+                    char buf[20];
+                    sprintf(buf, " %02X:%02X%c", (unsigned int)(b._getBuf()[startPos + i]), (unsigned int)(buffer2[i]), ((b._getBuf()[startPos + i] != buffer2[i]) ? '*' : ' '));
+                    std::cout << buf;
+                }
+                std::cout << std::endl;
+                throw cRuntimeError("%s serializer error: packet %s (%s) length is %d, serialized and serialized-deserialized-(%s)-serialized contents are differ at %d", getClassName(), pkt->getName(), to.str().c_str(), pkt->getByteLength(), td.str().c_str(), n);
+            }
         }
         delete[] buffer2;
         delete deserialized;

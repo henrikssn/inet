@@ -38,8 +38,9 @@ static uint8_t PREAMBLE[] = {0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0xD5};
 void EthernetSerializer::serialize(const cPacket *pkt, Buffer &b, Context& c)
 {
     ASSERT(b.getPos() == 0);
+    ASSERT(sizeof(PREAMBLE) == 8);
     const EtherFrame *ethPkt = check_and_cast<const EtherFrame *>(pkt);
-    if (ethPkt->getFrameByteLength() + 8 == ethPkt->getByteLength()) {
+    if (ethPkt->getFrameByteLength() + sizeof(PREAMBLE) == ethPkt->getByteLength()) {
         // Ethernet frame on net, with preamble and SFD
         b.writeNBytes(sizeof(PREAMBLE), PREAMBLE);
     }
@@ -55,7 +56,7 @@ void EthernetSerializer::serialize(const cPacket *pkt, Buffer &b, Context& c)
     }
     else if (dynamic_cast<const EtherFrameWithLLC *>(pkt)) {
         const EtherFrameWithLLC *frame = static_cast<const EtherFrameWithLLC *>(pkt);
-        b.writeUint16(frame->getByteLength());
+        b.writeUint16(frame->getFrameByteLength());
         b.writeByte(frame->getSsap());
         b.writeByte(frame->getDsap());
         b.writeByte(frame->getControl());
@@ -101,23 +102,59 @@ void EthernetSerializer::serialize(const cPacket *pkt, Buffer &b, Context& c)
 cPacket* EthernetSerializer::deserialize(Buffer &b, Context& c)
 {
     ASSERT(b.getPos() == 0);
-    bool withPreamble = false;
+    bool preambleLength = 0;
+    EtherFrame *etherPacket = nullptr;
+    ProtocolGroup protocolGroup = UNKNOWN;
+    int protocolType = -1;
 
-    //FIXME should detect and create the real packet type.
-    EthernetIIFrame *etherPacket = new EthernetIIFrame;
+    // check and read PREAMBLE //TODO should create a new EthernetPhyFrame for represent it
     if (b.getRemainder() > sizeof(PREAMBLE)) {
         if (!memcmp(b.accessNBytes(0), PREAMBLE, sizeof(PREAMBLE))) {
-            withPreamble = true;
+            preambleLength = sizeof(PREAMBLE);
             b.accessNBytes(sizeof(PREAMBLE));
         }
     }
 
-    etherPacket->setDest(b.readMACAddress());
-    etherPacket->setSrc(b.readMACAddress());
-    etherPacket->setEtherType(b.readUint16());
+    int frameLength = b.getRemainder();
+    MACAddress destAddr = b.readMACAddress();
+    MACAddress srcAddr = b.readMACAddress();
+    uint16_t typeOrLength = b.readUint16();
+
+    if (typeOrLength >= 1536) {
+        //FIXME should detect and create the real packet type.
+        EthernetIIFrame *ethernetIIPacket = new EthernetIIFrame();
+        ethernetIIPacket->setEtherType(typeOrLength);
+        protocolGroup = ETHERTYPE;
+        protocolType = typeOrLength;
+        etherPacket = ethernetIIPacket;
+    }
+    else {
+        frameLength = typeOrLength;
+        EtherFrameWithLLC *ethLLC = nullptr;
+        uint8_t ssap = b.readByte();
+        uint8_t dsap = b.readByte();
+        uint8_t ctrl = b.readByte();
+        if (dsap == 0xAA && ssap == 0xAA) { // snap frame
+            EtherFrameWithSNAP *ethSnap = new EtherFrameWithSNAP();
+            ethSnap->setOrgCode(((uint32_t)b.readByte() << 16) + b.readUint16());
+            protocolGroup = ETHERTYPE;
+            protocolType = b.readUint16();
+            ethSnap->setLocalcode(protocolType);
+            ethLLC = ethSnap;
+        }
+        else
+            ethLLC = new EtherFrameWithLLC();
+        ethLLC->setDsap(dsap);
+        ethLLC->setSsap(ssap);
+        ethLLC->setControl(ctrl);
+        etherPacket = ethLLC;
+    }
+
+    etherPacket->setDest(destAddr);
+    etherPacket->setSrc(srcAddr);
     etherPacket->setByteLength(b.getPos() + 4); // +4 for trailing crc
 
-    cPacket *encapPacket = SerializerBase::lookupAndDeserialize(b, c, ETHERTYPE, etherPacket->getEtherType(), 4);
+    cPacket *encapPacket = SerializerBase::lookupAndDeserialize(b, c, protocolGroup, protocolType, 4);
     ASSERT(encapPacket);
     etherPacket->encapsulate(encapPacket);
     etherPacket->setName(encapPacket->getName());
@@ -125,13 +162,14 @@ cPacket* EthernetSerializer::deserialize(Buffer &b, Context& c)
         etherPacket->addByteLength(b.getRemainder() - 4);
         b.accessNBytes(b.getRemainder() - 4);
     }
-    etherPacket->setFrameByteLength(etherPacket->getByteLength());
+    etherPacket->setFrameByteLength(frameLength);
     uint32_t calculatedFcs = ethernetCRC(b._getBuf(), b.getPos());
     uint32_t receivedFcs = b.readUint32();
     EV_DEBUG << "Calculated FCS: " << calculatedFcs << ", received FCS: " << receivedFcs << endl;
     if (receivedFcs != calculatedFcs)
         etherPacket->setBitError(true);
-    etherPacket->setFrameByteLength(withPreamble ? etherPacket->getByteLength() - sizeof(PREAMBLE) : etherPacket->getByteLength());
+    if (etherPacket->getByteLength() != frameLength + preambleLength)
+        etherPacket->setBitError(true);
     return etherPacket;
 }
 
